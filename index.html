@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cold Steel Accessory Quote</title>
+<style>
+body{font-family:Arial;margin:0;background:#f3f3f3;color:#111}
+.app{max-width:620px;margin:auto;padding:12px}
+h1{text-align:center;font-size:22px}
+.card{background:white;border-radius:16px;padding:14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+label{font-weight:bold;display:block;margin-top:10px}
+input{width:100%;padding:10px;font-size:16px;box-sizing:border-box;border-radius:9px;border:1px solid #bbb}
+.item{border:1px solid #ddd;border-radius:12px;padding:10px;margin-top:10px;background:#fafafa}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button{width:100%;padding:14px;font-size:18px;font-weight:bold;border:0;border-radius:10px;margin-top:10px}
+.add{background:#2b7cff;color:white}
+.calc{background:#111;color:white}
+.save{background:#0b6b2a;color:white}
+.clear{background:#666;color:white}
+.danger{background:#a61d1d;color:white}
+.big{font-size:34px;font-weight:bold;color:#0b6b2a}
+.result{font-size:18px;line-height:1.7}
+.quote{border:1px solid #ddd;border-radius:12px;padding:12px;margin-top:10px}
+.small{font-size:13px;color:#555}
+</style>
+</head>
+<body>
+<div class="app">
+<h1>Cold Steel Accessory Quote</h1>
+
+<div class="card">
+<label>Quote Name / Customer</label>
+<input id="name" placeholder="Customer name">
+
+<div id="items"></div>
+<button class="add" onclick="addItem()">+ Add Item</button>
+
+<label>Shipping</label>
+<input id="shipping" type="number" step="0.01" inputmode="decimal" value="0" oninput="calculateNow()">
+
+<label>Tax %</label>
+<input id="tax" type="number" step="0.01" inputmode="decimal" value="8.25" oninput="calculateNow()">
+
+<button class="calc" onclick="calculateNow()">Calculate Total</button>
+<button class="save" onclick="saveQuote()">Save Quote</button>
+<button class="clear" onclick="clearAll()">New / Clear</button>
+</div>
+
+<div class="card result">
+<div>Customer Total:</div>
+<div class="big" id="final">$0.00</div>
+<div>Profit: <strong id="profit">$0.00</strong></div>
+<div>Dealer Price Total: <strong id="priceTotal">$0.00</strong></div>
+<div>MAP Total: <strong id="mapTotal">$0.00</strong></div>
+<div>MSRP Total: <strong id="msrpTotal">$0.00</strong></div>
+<div>Sell Price Total: <strong id="sellTotal">$0.00</strong></div>
+<div>Shipping: <strong id="shipTotal">$0.00</strong></div>
+<div>Tax: <strong id="taxamt">$0.00</strong></div>
+</div>
+
+<div class="card">
+<h2 style="margin-top:0;font-size:20px;">Saved Quotes</h2>
+<div id="saved"></div>
+<div class="small">Saved quotes stay on this phone/browser unless website data is cleared.</div>
+</div>
+</div>
+
+<script>
+var editIndex = -1;
+var itemCount = 0;
+
+function money(v){
+  v = Number(v) || 0;
+  return "$" + (Math.round(v * 100) / 100).toFixed(2);
+}
+function numValue(el){
+  var v = parseFloat(el.value);
+  return isNaN(v) ? 0 : v;
+}
+function addItem(data){
+  itemCount++;
+  var box = document.createElement("div");
+  box.className = "item";
+  box.innerHTML = `
+    <label>Item ${itemCount}</label>
+    <div class="grid">
+      <div><span class="small">Dealer Price</span><input class="price" type="number" step="0.01" inputmode="decimal" placeholder="43.45"></div>
+      <div><span class="small">MAP</span><input class="map" type="number" step="0.01" inputmode="decimal" placeholder="66.45"></div>
+      <div><span class="small">MSRP</span><input class="msrp" type="number" step="0.01" inputmode="decimal" placeholder="69.95"></div>
+      <div><span class="small">Your Sell Price</span><input class="sell" type="number" step="0.01" inputmode="decimal" placeholder="66.45"></div>
+    </div>
+    <button class="danger" onclick="this.parentElement.remove(); calculateNow();">Remove Item</button>
+  `;
+  document.getElementById("items").appendChild(box);
+
+  if(data){
+    box.querySelector(".price").value = data.price || "";
+    box.querySelector(".map").value = data.map || "";
+    box.querySelector(".msrp").value = data.msrp || "";
+    box.querySelector(".sell").value = data.sell || "";
+  }
+
+  var inputs = box.querySelectorAll("input");
+  for(var i=0;i<inputs.length;i++){
+    inputs[i].addEventListener("input", calculateNow);
+  }
+  calculateNow();
+}
+function getQuote(){
+  var items = [];
+  var priceTotal = 0, mapTotal = 0, msrpTotal = 0, sellTotal = 0;
+  var itemBoxes = document.querySelectorAll(".item");
+
+  for(var i=0;i<itemBoxes.length;i++){
+    var price = numValue(itemBoxes[i].querySelector(".price"));
+    var map = numValue(itemBoxes[i].querySelector(".map"));
+    var msrp = numValue(itemBoxes[i].querySelector(".msrp"));
+    var sell = numValue(itemBoxes[i].querySelector(".sell"));
+
+    if(price || map || msrp || sell){
+      items.push({price:price,map:map,msrp:msrp,sell:sell});
+      priceTotal += price;
+      mapTotal += map;
+      msrpTotal += msrp;
+      sellTotal += sell;
+    }
+  }
+
+  var shipping = numValue(document.getElementById("shipping"));
+  var taxRate = numValue(document.getElementById("tax")) / 100;
+  var taxableAmount = sellTotal;
+  var taxamt = taxableAmount * taxRate;
+  var final = sellTotal + shipping + taxamt;
+  var profit = sellTotal - priceTotal - shipping;
+
+  return {
+    name: document.getElementById("name").value || "Unnamed Quote",
+    items:items,
+    shipping:shipping,
+    tax:numValue(document.getElementById("tax")),
+    priceTotal:priceTotal,
+    mapTotal:mapTotal,
+    msrpTotal:msrpTotal,
+    sellTotal:sellTotal,
+    taxamt:taxamt,
+    final:final,
+    profit:profit,
+    date:new Date().toLocaleString()
+  };
+}
+function calculateNow(){
+  var q = getQuote();
+  document.getElementById("final").innerHTML = money(q.final);
+  document.getElementById("profit").innerHTML = money(q.profit);
+  document.getElementById("priceTotal").innerHTML = money(q.priceTotal);
+  document.getElementById("mapTotal").innerHTML = money(q.mapTotal);
+  document.getElementById("msrpTotal").innerHTML = money(q.msrpTotal);
+  document.getElementById("sellTotal").innerHTML = money(q.sellTotal);
+  document.getElementById("shipTotal").innerHTML = money(q.shipping);
+  document.getElementById("taxamt").innerHTML = money(q.taxamt);
+  return q;
+}
+function saveQuote(){
+  var q = calculateNow();
+  var quotes = JSON.parse(localStorage.getItem("cs_line_quotes") || "[]");
+  if(editIndex >= 0){ quotes[editIndex] = q; }
+  else { quotes.unshift(q); editIndex = 0; }
+  localStorage.setItem("cs_line_quotes", JSON.stringify(quotes));
+  showSaved();
+  alert("Quote saved");
+}
+function openQuote(index){
+  var quotes = JSON.parse(localStorage.getItem("cs_line_quotes") || "[]");
+  var q = quotes[index];
+  if(!q) return;
+
+  editIndex = index;
+  document.getElementById("name").value = q.name;
+  document.getElementById("shipping").value = q.shipping;
+  document.getElementById("tax").value = q.tax;
+  document.getElementById("items").innerHTML = "";
+  itemCount = 0;
+
+  for(var i=0;i<q.items.length;i++){ addItem(q.items[i]); }
+  if(q.items.length === 0) addItem();
+
+  calculateNow();
+  window.scrollTo(0,0);
+}
+function deleteQuote(index){
+  if(!confirm("Delete this quote?")) return;
+  var quotes = JSON.parse(localStorage.getItem("cs_line_quotes") || "[]");
+  quotes.splice(index,1);
+  localStorage.setItem("cs_line_quotes", JSON.stringify(quotes));
+  showSaved();
+}
+function clearAll(){
+  editIndex = -1;
+  document.getElementById("name").value = "";
+  document.getElementById("shipping").value = "0";
+  document.getElementById("tax").value = "8.25";
+  document.getElementById("items").innerHTML = "";
+  itemCount = 0;
+  addItem();
+  calculateNow();
+}
+function showSaved(){
+  var box = document.getElementById("saved");
+  var quotes = JSON.parse(localStorage.getItem("cs_line_quotes") || "[]");
+  box.innerHTML = "";
+  if(quotes.length === 0){
+    box.innerHTML = "<div class='small'>No saved quotes yet.</div>";
+    return;
+  }
+  for(var i=0;i<quotes.length;i++){
+    var q = quotes[i];
+    box.innerHTML += "<div class='quote'><b>"+q.name+"</b><br><span class='small'>"+q.date+"</span><br>Total: <b>"+money(q.final)+"</b> | Profit: <b>"+money(q.profit)+"</b><button class='clear' onclick='openQuote("+i+")'>Open / Edit</button><button class='danger' onclick='deleteQuote("+i+")'>Delete</button></div>";
+  }
+}
+
+addItem();
+showSaved();
+calculateNow();
+</script>
+</body>
+</html>
